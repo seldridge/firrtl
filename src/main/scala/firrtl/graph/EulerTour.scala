@@ -45,6 +45,7 @@ class EulerTour[T](val r: Map[T, Int], val e: Seq[T], val h: Seq[Int]) {
     def tableRecursive(base: Int, size: Int): Int = {
       if (size == 0) {
         tmp(base)(size) = base
+        println(s"[info] tableRecursive: $base, $size, $base")
         base
       } else {
         val (a, b, c) = (base, base + (1 << (size - 1)), size - 1)
@@ -57,6 +58,7 @@ class EulerTour[T](val r: Map[T, Int], val e: Seq[T], val h: Seq[Int]) {
 
         val min = if (x(l) < x(r)) l else r
         tmp(base)(size) = min
+        println(s"[info] tableRecursive: $base, $size, $min")
         assert(min >= base)
         min
       }
@@ -87,8 +89,10 @@ class EulerTour[T](val r: Map[T, Int], val e: Seq[T], val h: Seq[Int]) {
       .map(_.foldLeft(Seq(0))((h, pm) => (h.head + pm) +: h).reverse)
       .map(a => {
         var tmp = Array.ofDim[Int](m, m)
+        println(s"[info] $a")
         for (i <- 0 to size; j <- i to size) yield {
           val window = a.slice(i, j + 1)
+          println(s"[info]   - ($i, $j): ${window.indexOf(window.min) + i}")
           tmp(i)(j) = window.indexOf(window.min) + i }
         tmp }).toArray
     out
@@ -121,6 +125,12 @@ class EulerTour[T](val r: Map[T, Int], val e: Seq[T], val h: Seq[Int]) {
     * Performance: [Preprocessing, Query] -> [O(n), O(1)]
     */
   def rmqBV(x: T, y: T): T = {
+    println(s"[info] rmqBV: ${x} <-> ${y}")
+    println(s"[info]   - blocks:")
+    blocks.zipWithIndex.zip(a).zip(b).map { case (((b, i), a), c) =>
+      println(s"[info]     - $i: ${b}: ${c}, ${a}, ${tableIdx(i)}")
+    }
+
     val Seq(i, j) = Seq(r(x), r(y)).sorted
 
     val (block_i, block_j) = (i / m, j / m)
@@ -130,11 +140,20 @@ class EulerTour[T](val r: Map[T, Int], val e: Seq[T], val h: Seq[Int]) {
     //   * i and j are in the same block    -> one lookup
     //   * i and j are in adjacent blocks   -> two table lookups
     //   * i and j have blocks between them -> two table lookups, two ST lookups
+    println(s"[info]   - selected blocks")
+    println(s"[info]     - block_i: $block_i")
+    println(s"[info]     - block_j: $block_j")
+    println(s"[info]   - selected words")
+    println(s"[info]     - word_i: $word_i")
+    println(s"[info]     - word_j: $word_j")
     val minIndices = (block_i, block_j) match {
       case (bi, bj) if (block_i == block_j) =>
         val min_i = block_i * m + tables(tableIdx(block_i))(word_i)(word_j)
+        println(s"[info] tableIdx(${block_i}): ${tableIdx(block_i)}($word_i)(${m-1}): ${tables(tableIdx(block_i))(word_i)(m-1)}")
         Seq(min_i)
       case (bi, bj) if (block_i == block_j - 1) =>
+        println(s"[info] tableIdx(${block_i}): ${tableIdx(block_i)}($word_i)(${m-1}): ${tables(tableIdx(block_i))(word_i)(m-1)}")
+        println(s"[info] tableIdx(${block_j}): ${tableIdx(block_j)}(0)($word_j): ${tables(tableIdx(block_j))(0)(word_j)}")
         val min_i = block_i * m + tables(tableIdx(block_i))(word_i)( m - 1)
         val min_j = block_j * m + tables(tableIdx(block_j))(     0)(word_j)
         Seq(min_i, min_j)
@@ -145,12 +164,15 @@ class EulerTour[T](val r: Map[T, Int], val e: Seq[T], val h: Seq[Int]) {
           val range = math.floor(lg(block_j - block_i - 1)).toInt
           val base_0 = block_i + 1
           val base_1 = block_j - (1 << range)
+          println(s"[info]     - range_0: [$base_0, $range (${base_0 + math.pow(2, range).toInt - 1})]")
+          println(s"[info]     - range_1: [$base_1, $range (${base_1 + math.pow(2, range).toInt - 1})]")
 
           val (idx_0, idx_1) = (st(base_0)(range), st(base_1)(range))
           val (min_0, min_1) = (b(idx_0) + idx_0 * m, b(idx_1) + idx_1 * m)
           (min_0, min_1) }
         Seq(min_i, min_between_l, min_between_r, min_j)
     }
+    println(s"[info]   - minimums: $minIndices")
     e(minIndices.minBy(h(_)))
   }
 
