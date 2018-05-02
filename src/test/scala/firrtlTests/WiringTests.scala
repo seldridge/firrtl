@@ -853,10 +853,8 @@ class WiringTests extends FirrtlFlatSpec {
     (parse(retC.serialize).serialize) should be (parse(check).serialize)
   }
 
-  it should "wire to the top module" in {
-    val sinks = Seq(ModuleName("Top", CircuitName("Top")))
-    val sourceA = ComponentName("a", ModuleName("A", CircuitName("Top")))
-    val sas = Seq(WiringInfo(sourceA, sinks, "pin"))
+  behavior of "Multi-sink wiring"
+  it should "wire a single source to the top module" in {
     val input =
       """|circuit Top :
          |  module Top :
@@ -865,7 +863,7 @@ class WiringTests extends FirrtlFlatSpec {
          |    a.clock <= clock
          |  module A :
          |    input clock: Clock
-         |    reg a: UInt<5>, clock
+         |    reg r: UInt<5>, clock
          |""".stripMargin
     val check =
       """|circuit Top :
@@ -874,18 +872,194 @@ class WiringTests extends FirrtlFlatSpec {
          |    output pin: UInt<5>
          |    inst a of A
          |    a.clock <= clock
-         |    pin <= a.a_0
+         |    pin <= a.r_0
          |  module A :
          |    input clock: Clock
-         |    output a_0: UInt<5>
-         |    reg a: UInt<5>, clock
-         |    a_0 <= a
+         |    output r_0: UInt<5>
+         |    reg r: UInt<5>, clock
+         |    r_0 <= r
          |""".stripMargin
+    val sinks = Seq(ModuleName("Top", CircuitName("Top")))
+    val sourceA = ComponentName("r", ModuleName("A", CircuitName("Top")))
+    val sas = Seq(WiringInfo(sourceA, sinks, "pin"))
     val c = passes.foldLeft(parse(input)) {
       (c: Circuit, p: Pass) => p.run(c)
     }
     val wiringPass = new Wiring(sas)
     val retC = wiringPass.run(c)
     (parse(retC.serialize).serialize) should be (parse(check).serialize)
+  }
+  it should "wire multiple disjoint sources to the top module" in {
+    val input =
+      """|circuit Top :
+         |  module Top :
+         |    input clock: Clock
+         |    inst a of A
+         |    a.clock <= clock
+         |    inst b of B
+         |    b.clock <= clock
+         |  module A :
+         |    input clock: Clock
+         |    reg r: UInt<5>, clock
+         |  module B :
+         |    input clock: Clock
+         |    reg r: UInt<5>, clock
+         |""".stripMargin
+    val check =
+      """|circuit Top :
+         |  module Top :
+         |    input clock: Clock
+         |    output pin: UInt<5>
+         |    output pin_0: UInt<5>
+         |    inst a of A
+         |    a.clock <= clock
+         |    inst b of B
+         |    b.clock <= clock
+         |    pin <= a.r_0
+         |    pin_0 <= b.r_1
+         |  module A :
+         |    input clock: Clock
+         |    output r_0: UInt<5>
+         |    reg r: UInt<5>, clock
+         |    r_0 <= r
+         |  module B :
+         |    input clock: Clock
+         |    output r_1: UInt<5>
+         |    reg r: UInt<5>, clock
+         |    r_1 <= r
+         |""".stripMargin
+    val sinks = Seq(ModuleName("Top", CircuitName("Top")))
+    val sourceA = ComponentName("r", ModuleName("A", CircuitName("Top")))
+    val sourceB = ComponentName("r", ModuleName("B", CircuitName("Top")))
+    val sas = Seq(WiringInfo(sourceA, sinks, "pin"), WiringInfo(sourceB, sinks, "pin"))
+    val c = passes.foldLeft(parse(input)) {
+      (c: Circuit, p: Pass) => p.run(c)
+    }
+    val wiringPass = new Wiring(sas)
+    val retC = wiringPass.run(c)
+    (parse(retC.serialize).serialize) should be (parse(check).serialize)
+  }
+  ignore should "wire multiply instantiated sources to the top module" in {
+    val input =
+      """|circuit Top :
+         |  module Top :
+         |    input clock: Clock
+         |    inst a0 of A
+         |    a0.clock <= clock
+         |    inst a1 of A
+         |    a1.clock <= clock
+         |  module A :
+         |    input clock: Clock
+         |    reg r: UInt<5>, clock
+         |""".stripMargin
+    val check =
+      """|circuit Top :
+         |  module Top :
+         |    input clock: Clock
+         |    output pin: UInt<5>
+         |    output pin_0: UInt<5>
+         |    inst a0 of A
+         |    a0.clock <= clock
+         |    inst a1 of A
+         |    a1.clock <= clock
+         |    pin <= a0.r_0
+         |    pin_0 <= a1.r_0
+         |  module A :
+         |    input clock: Clock
+         |    output r_0: UInt<5>
+         |    reg r: UInt<5>, clock
+         |    r_0 <= r
+         |""".stripMargin
+    val sinks = Seq(ModuleName("Top", CircuitName("Top")))
+    val sourceA = ComponentName("r", ModuleName("A", CircuitName("Top")))
+    val sas = Seq(WiringInfo(sourceA, sinks, "pin"))
+    val c = passes.foldLeft(parse(input)) {
+      (c: Circuit, p: Pass) => p.run(c)
+    }
+    val wiringPass = new Wiring(sas)
+    val retC = wiringPass.run(c)
+    (parse(retC.serialize).serialize) should be (parse(check).serialize)
+  }
+  it should "wire multiple sources to a non-top component" is (pending)
+  ignore should "wire multiple sources to a non-top module" in {
+    val input =
+      """|circuit Top :
+         |  module Top :
+         |    input clock: Clock
+         |    inst a0 of A
+         |    a0.clock <= clock
+         |    inst a1 of A
+         |    a1.clock <= clock
+         |    inst b of B
+         |    b.clock <= clock
+         |  module A :
+         |    input clock: Clock
+         |    reg r: UInt<5>, clock
+         |  extmodule B :
+         |    input clock: Clock
+         |""".stripMargin
+    val check =
+      """|circuit Top :
+         |  module Top :
+         |    input clock: Clock
+         |    wire r: UInt<5>
+         |    wire r_0: UInt<5>
+         |    inst a0 of A
+         |    a0.clock <= clock
+         |    inst a1 of A
+         |    a1.clock <= clock
+         |    inst b of B
+         |    b.clock <= clock
+         |    r <= a0.r_0
+         |    r_0 <= a1.r_0
+         |    b.pin <= r
+         |    b.pin_0 <= r_0
+         |  module A :
+         |    input clock: Clock
+         |    output r_0: UInt<5>
+         |    reg r: UInt<5>, clock
+         |    r_0 <= r
+         |  extmodule B :
+         |    input clock: Clock
+         |    input pin: UInt<5>
+         |    input pin_0: UInt<5>
+         |""".stripMargin
+    val sinks = Seq(ModuleName("B", CircuitName("Top")))
+    val sourceA = ComponentName("r", ModuleName("A", CircuitName("Top")))
+    val sas = Seq(WiringInfo(sourceA, sinks, "pin"))
+    val c = passes.foldLeft(parse(input)) {
+      (c: Circuit, p: Pass) => p.run(c)
+    }
+    val wiringPass = new Wiring(sas)
+    val retC = wiringPass.run(c)
+    (parse(retC.serialize).serialize) should be (parse(check).serialize)
+  }
+  ignore should "fail if a multi-sink module is between sources" in {
+    val input =
+      """|circuit Top :
+         |  module Top :
+         |    input clock: Clock
+         |    inst a of A
+         |    a.clock <= clock
+         |    inst b of B
+         |    b.clock <= clock
+         |  module A :
+         |    input clock: Clock
+         |    inst b of B
+         |    b.clock <= clock
+         |    reg r: UInt<5>, clock
+         |  module B :
+         |    input clock: Clock
+         |    reg r: UInt<5>, clock
+         |""".stripMargin
+    val sinks = Seq(ModuleName("A", CircuitName("Top")))
+    val sourceA = ComponentName("r", ModuleName("A", CircuitName("Top")))
+    val sas = Seq(WiringInfo(sourceA, sinks, "pin"))
+    val c = passes.foldLeft(parse(input)) {
+      (c: Circuit, p: Pass) => p.run(c)
+    }
+    val wiringPass = new Wiring(sas)
+    val retC = wiringPass.run(c)
+    a [WiringException] should be thrownBy (wiringPass.run(c))
   }
 }
