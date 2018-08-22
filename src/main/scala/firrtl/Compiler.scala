@@ -451,7 +451,7 @@ trait Compiler extends LazyLogging {
     */
   def compileAndEmit(state: CircuitState,
                      customTransforms: Seq[Transform] = Seq.empty): CircuitState = {
-    val emitAnno = EmitCircuitAnnotation(emitter.getClass)
+    val emitAnno = EmitterAnnotation(emitter.getClass)
     compile(state.copy(annotations = emitAnno +: state.annotations), customTransforms)
   }
 
@@ -477,4 +477,3 @@ trait Compiler extends LazyLogging {
   }
 
 }
-

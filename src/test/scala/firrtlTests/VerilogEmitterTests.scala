@@ -167,7 +167,7 @@ class VerilogEmitterSpec extends FirrtlFlatSpec {
          |""".stripMargin
     for (w <- Seq(6, 8)) {
       val circuit = passes.foldLeft(parse(input(w))) { case (c, p) => p.run(c) }
-      val state = CircuitState(circuit, LowForm, Seq(EmitCircuitAnnotation(classOf[VerilogEmitter])))
+      val state = CircuitState(circuit, LowForm, Seq(EmitterAnnotation(classOf[VerilogEmitter])))
       val emitter = new VerilogEmitter
       val result = emitter.execute(state)
       result should containLine ("assign out = in;")

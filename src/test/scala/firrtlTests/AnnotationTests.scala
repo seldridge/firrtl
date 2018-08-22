@@ -12,6 +12,7 @@ import firrtl.passes.InlineAnnotation
 import firrtl.passes.memlib.PinAnnotation
 import firrtl.util.BackendCompilationUtilities
 import firrtl.transforms.DontTouchAnnotation
+import firrtl.options.ExecutionOptionsManager
 import net.jcazevedo.moultingyaml._
 import org.scalatest.Matchers
 import logger._
@@ -550,7 +551,7 @@ class JsonAnnotationTests extends AnnotationTests with BackendCompilationUtiliti
     annos should be (readAnnos)
   }
 
-  private def setupManager(annoFileText: Option[String]) = {
+  private def setupManager(annoFileText: Option[String]): Array[String] = {
     val source = """
       |circuit test :
       |  module test :
@@ -567,24 +568,26 @@ class JsonAnnotationTests extends AnnotationTests with BackendCompilationUtiliti
       w.close()
     }
 
-    new ExecutionOptionsManager("annos") with HasFirrtlOptions {
-      commonOptions = CommonOptions(targetDirName = testDir.getPath)
-      firrtlOptions = FirrtlExecutionOptions(
-        firrtlSource = Some(source),
-        annotationFileNames = List(annoFile.getPath)
-      )
-    }
+
+    Array( "--target-dir", testDir.getPath,
+           "--firrtl-source", source,
+           "--annotation-file", annoFile.getPath)
   }
 
-  "Annotation file not found" should "give a reasonable error message" in {
-    val manager = setupManager(None)
+  /* We throw better exceptions than we're checking for, e.g., an
+   * [[AnnotationFileNotFoundException]] is thrown if the annotation file
+   * isn't found. However, scopt swallows exceptions and returns an
+   * Option[T]. We pick this up and return a [[FIRRTLException]] on None,
+   * but there's no way to get at the actual root exception. */
+  behavior of "Reasonable error messages"
 
-    an [AnnotationFileNotFoundException] shouldBe thrownBy {
-      Driver.execute(manager)
-    }
+  it should "print for 'Annotation File Not Found' condition" in {
+    val args = setupManager(None)
+
+    a [FIRRTLException] shouldBe thrownBy { Driver.execute(args) }
   }
 
-  "Annotation class not found" should "give a reasonable error message" in {
+  it should "print for 'Annotation Class Not Found' condition" in {
     val anno = """
       |[
       |  {
@@ -592,14 +595,12 @@ class JsonAnnotationTests extends AnnotationTests with BackendCompilationUtiliti
       |    "target":"test.test.y"
       |  }
       |] """.stripMargin
-    val manager = setupManager(Some(anno))
+    val args = setupManager(Some(anno))
 
-    the [Exception] thrownBy Driver.execute(manager) should matchPattern {
-      case InvalidAnnotationFileException(_, _: AnnotationClassNotFoundException) =>
-    }
+    a [FIRRTLException] shouldBe thrownBy { Driver.execute(args) }
   }
 
-  "Malformed annotation file" should "give a reasonable error message" in {
+  it should "print for 'Malformed Annotation File' condition" in {
     val anno = """
       |[
       |  {
@@ -607,26 +608,21 @@ class JsonAnnotationTests extends AnnotationTests with BackendCompilationUtiliti
       |    "target":"test.test.y"
       |  }
       |] """.stripMargin
-    val manager = setupManager(Some(anno))
+    val args = setupManager(Some(anno))
 
-    the [Exception] thrownBy Driver.execute(manager) should matchPattern {
-      case InvalidAnnotationFileException(_, _: InvalidAnnotationJSONException) =>
-    }
+    a [FIRRTLException] shouldBe thrownBy { Driver.execute(args) }
   }
 
-  "Non-array annotation file" should "give a reasonable error message" in {
+  it should "print for 'Non-Array Annotation File' condition" in {
     val anno = """
       |{
       |  "class":"firrtl.transforms.DontTouchAnnotation",
       |  "target":"test.test.y"
       |}
       |""".stripMargin
-    val manager = setupManager(Some(anno))
+    val args = setupManager(Some(anno))
 
-    the [Exception] thrownBy Driver.execute(manager) should matchPattern {
-      case InvalidAnnotationFileException(_, InvalidAnnotationJSONException(msg))
-        if msg.contains("JObject") =>
-    }
+    a [FIRRTLException] shouldBe thrownBy { Driver.execute(args) }
   }
 
   object DoNothingTransform extends Transform {

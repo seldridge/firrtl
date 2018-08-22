@@ -17,7 +17,7 @@ import scopt.OptionParser
 sealed trait FirrtlOption extends HasScoptOptions
 
 /** Holds the name of the top module
-  *  - maps to [[CommonOptions.topName]]
+  *  - maps to [[FirrtlExecutionOptions.topName]]
   *  - set on the command line with `-tn/--top-name`
   * @param value top module name
   */
@@ -35,7 +35,7 @@ object TopNameAnnotation {
 }
 
 /** Holds the name of the target directory
-  *  - maps to [[CommonOptions.targetDirName]]
+  *  - maps to [[FirrtlExecutionOptions.targetDirName]]
   *  - set with `-td/--target-dir`
   *  - if unset, a [[TargetDirAnnotation]] will be generated with the
   * @param value target directory name
@@ -46,11 +46,11 @@ case class TargetDirAnnotation(targetDirName: String = ".") extends NoTargetAnno
     .valueName("<target-directory>")
     .action( (x, c) => c ++ Seq(TargetDirAnnotation(x)) )
     .unbounded() // See [Note 1]
-    .text(s"Work directory for intermediate files/blackboxes, default is ${CommonOptions().targetDirName}")
+    .text(s"Work directory for intermediate files/blackboxes, default is ${FirrtlExecutionOptions().targetDirName}")
 }
 
 /** Describes the verbosity of information to log
-  *  - maps to [[CommonOptions.globalLogLevel]]
+  *  - maps to [[FirrtlExecutionOptions.globalLogLevel]]
   *  - set with `-ll/--log-level`
   *  - if unset, a [[LogLevelAnnotation]] with the default log level will be emitted
   * @param level the level of logging
@@ -67,11 +67,11 @@ case class LogLevelAnnotation(globalLogLevel: LogLevel.Value = LogLevel.None) ex
       if (Array("error", "warn", "info", "debug", "trace").contains(x.toLowerCase)) { p.success      }
       else                                                                          { p.failure(msg) }}
     .unbounded() // See [Note 1]
-    .text(s"Sets the verbosity level of logging, default is ${CommonOptions().globalLogLevel}")
+    .text(s"Sets the verbosity level of logging, default is ${FirrtlExecutionOptions().globalLogLevel}")
 }
 
 /** Describes a mapping of a class to a specific log level
-  *  - maps to [[CommonOptions.classLogLevels]]
+  *  - maps to [[FirrtlExecutionOptions.classLogLevels]]
   *  - set with `-cll/--class-log-level`
   * @param name the class name to log
   * @param level the verbosity level
@@ -94,7 +94,7 @@ object ClassLogLevelAnnotation {
 }
 
 /** Enables logging to a file (as opposed to STDOUT)
-  *  - maps to [[CommonOptions.logToFile]]
+  *  - maps to [[FirrtlExecutionOptions.logToFile]]
   *  - enabled with `-ltf/--log-to-file`
   */
 case object LogToFileAnnotation extends NoTargetAnnotation with FirrtlOption {
@@ -106,7 +106,7 @@ case object LogToFileAnnotation extends NoTargetAnnotation with FirrtlOption {
 }
 
 /** Enables class names in log output
-  *  - maps to [[CommonOptions.logClassNames]]
+  *  - maps to [[FirrtlExecutionOptions.logClassNames]]
   *  - enabled with `-lcn/--log-class-names`
   */
 case object LogClassNamesAnnotation extends NoTargetAnnotation with FirrtlOption {
@@ -118,7 +118,7 @@ case object LogClassNamesAnnotation extends NoTargetAnnotation with FirrtlOption
 }
 
 /** Additional arguments
-  *  - maps to [[CommonOptions.programArgs]]
+  *  - maps to [[FirrtlExecutionOptions.programArgs]]
   *  - set with any trailing option on the command line
   * @param value one [[scala.String]] argument
   */
