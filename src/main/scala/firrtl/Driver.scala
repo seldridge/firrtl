@@ -2,23 +2,21 @@
 
 package firrtl
 
-import scala.collection._
-import scala.io.Source
-import scala.sys.process.{BasicIO, ProcessLogger, stringSeqToProcess}
-import scala.util.{Failure, Success, Try}
-import scala.util.control.ControlThrowable
 import java.io.File
 
-import net.jcazevedo.moultingyaml._
-import logger.Logger
-import annotations._
-import firrtl.annotations.AnnotationYamlProtocol._
-import firrtl.passes.{PassException, PassExceptions}
-import firrtl.transforms._
-import firrtl.Utils.throwInternalError
-import firrtl.options.{ExecutionOptionsManager, OptionsException}
-import firrtl.options.Viewer._
 import firrtl.FirrtlViewer._
+import firrtl.Utils.throwInternalError
+import firrtl.annotations._
+import firrtl.options.Viewer._
+import logger.LoggerViewer._
+import firrtl.options.{ExecutionOptionsManager, OptionsException}
+import firrtl.passes.{PassException, PassExceptions}
+import logger.{Logger, LoggerOptions, LoggerViewer}
+
+import scala.collection._
+import scala.sys.process.{BasicIO, ProcessLogger, stringSeqToProcess}
+import scala.util.control.ControlThrowable
+import scala.util.{Failure, Success}
 
 /**
   * The Driver enables invocation of the FIRRTL compiler using command
@@ -45,15 +43,16 @@ import firrtl.FirrtlViewer._
   * @see firrtlTests/DriverSpec.scala in the test directory for a lot more examples
   * @see [[CompilerUtils.mergeTransforms]] to see how customTransformations are inserted
   */
-
 object Driver extends firrtl.options.Driver {
   val optionsManager = new ExecutionOptionsManager("firrtl") with HasFirrtlExecutionOptions
 
+  //scalastyle:off cyclomatic.complexity method.length
   private def execute(annotations: AnnotationSeq): FirrtlExecutionResult = {
-    val firrtlOptions = view[FirrtlExecutionOptions](annotations).getOrElse{
-      throw new FIRRTLException("Unable to determine FIRRTL options for provided command line options and annotations") }
+    val firrtlOptions = FirrtlViewer.getView(annotations)
 
-    Logger.makeScope(firrtlOptions) {
+    val loggerOptions = LoggerViewer.getView(annotations)
+
+    Logger.makeScope(loggerOptions) {
       // Wrap compilation in a try/catch to present Scala MatchErrors in a more user-friendly format.
       val finalState = try {
         val circuit = firrtlOptions.getCircuit match {

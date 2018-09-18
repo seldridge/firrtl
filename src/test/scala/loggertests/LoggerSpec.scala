@@ -2,12 +2,12 @@
 
 package loggertests
 
-import firrtl.{HasFirrtlExecutionOptions, FirrtlExecutionOptions}
+import firrtl.{AnnotationSeq, FirrtlExecutionOptions, HasFirrtlExecutionOptions, FIRRTLException}
 import firrtl.options.ExecutionOptionsManager
 import firrtl.options.Viewer._
-import firrtl.FirrtlViewer._
+import logger.LoggerViewer._
 import logger.Logger.OutputCaptor
-import logger.{LazyLogging, LogLevel, Logger}
+import logger.{LazyLogging, LogLevel, Logger, LoggerOptions, LogLevelAnnotation}
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
 
 object LoggerSpec {
@@ -40,12 +40,14 @@ class LogsInfo3 extends LazyLogging {
 }
 class LoggerSpec extends FreeSpec with Matchers with OneInstancePerTest with LazyLogging {
 
-  def argsToOptions(args: Array[String]): FirrtlExecutionOptions = {
+  def argsToOptions(args: Array[String]): AnnotationSeq = {
     val optionsManager = new ExecutionOptionsManager("test") with HasFirrtlExecutionOptions
-    view[FirrtlExecutionOptions](optionsManager.parse(args)).get
+    optionsManager.parse(args)
   }
 
   val dummyOptions = argsToOptions(Array("--top-name", "null"))
+
+
   "Logger is a simple but powerful logging system" - {
     "Following tests show how global level can control logging" - {
       "only error shows up by default" in {
@@ -334,6 +336,23 @@ class LoggerSpec extends FreeSpec with Matchers with OneInstancePerTest with Laz
 
         Logger.getGlobalLevel should be (LogLevel.Warn)
       }
+    }
+    "the following tests demonstrate expected failures" - {
+      def shouldExceptOnOptionsOrAnnotations(name: String, args: Array[String], annotations: AnnotationSeq) {
+        def argsToOptions(args: Array[String], initAnnos: AnnotationSeq = Seq.empty): LoggerOptions = {
+          val optionsManager = new ExecutionOptionsManager("test") with HasFirrtlExecutionOptions
+          val annotations = optionsManager.parse(args, initAnnos)
+          view[LoggerOptions](annotations).get
+        }
+        name - {
+          "via command line options" in {
+            a [FIRRTLException] should be thrownBy (argsToOptions(Array("-tn", "foo") ++ args)) }
+          "via annotations" in {
+            a [FIRRTLException] should be thrownBy (argsToOptions(Array("-tn", "foo"), annotations)) }}}
+
+      shouldExceptOnOptionsOrAnnotations("should fail with multiple log levels",
+                                         Array("--log-level", "Info", "-ll", "debug"),
+                                         Seq(LogLevelAnnotation(LogLevel.Info), LogLevelAnnotation(LogLevel.Info)))
     }
   }
 }

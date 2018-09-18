@@ -11,5 +11,5 @@ class MemLibOptions extends RegisteredLibrary {
   def addOptions(p: OptionParser[AnnotationSeq]): Unit =
     Seq( new InferReadWrite,
          new ReplSeqMem )
-      .map(_.addOptions(p))
+      .foreach(_.addOptions(p))
 }

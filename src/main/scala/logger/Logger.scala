@@ -4,18 +4,17 @@ package logger
 
 import java.io.{ByteArrayOutputStream, File, FileOutputStream, PrintStream}
 
-import firrtl.{FirrtlExecutionOptions, HasFirrtlExecutionOptions}
+import firrtl.{AnnotationSeq, HasFirrtlExecutionOptions}
 import firrtl.options.ExecutionOptionsManager
 import firrtl.options.Viewer._
-import firrtl.FirrtlViewer._
+import logger.LoggerViewer._
 
 import scala.util.DynamicVariable
 
 /**
   * This provides a facility for a log4scala* type logging system.  Why did we write our own?  Because
   * the canned ones are just to darned hard to turn on, particularly when embedded in a distribution.
-  * This one can be turned on programmatically or with the options exposed in the [[firrtl.CommonOptions]]
-  * and [[options.ExecutionOptionsManager]] API's in firrtl.
+  * This one can be turned on programmatically or with the options exposed in the [[LoggerOptions]].
   * There are 4 main options.
   *  * a simple global option to turn on all in scope (and across threads, might want to fix this)
   *  * turn on specific levels for specific fully qualified class names
@@ -39,7 +38,7 @@ object LogLevel extends Enumeration {
     case "info"  => LogLevel.Info
     case "debug" => LogLevel.Debug
     case "trace" => LogLevel.Trace
-    case level => throw new Exception("Unknown LogLevel '$level'")
+    case level => throw new Exception(s"Unknown LogLevel '$level'")
   }
 }
 
@@ -55,7 +54,7 @@ trait LazyLogging {
   * when used in multi-threaded environments
   */
 private class LoggerState {
-  var globalLevel = LogLevel.None
+  var globalLevel: LogLevel.Value = LogLevel.None
   val classLevels = new scala.collection.mutable.HashMap[String, LogLevel.Value]
   val classToLevelCache = new scala.collection.mutable.HashMap[String, LogLevel.Value]
   var logClassNames = false
@@ -118,12 +117,12 @@ object Logger {
     * This creates a block of code that will have access to the
     * thread specific logger.  The state will be set according to the
     * logging options set in the common options of the manager
-    * @param manager  source of logger settings
+    * @param options  source of logger settings
     * @param codeBlock      code to be run with these logger settings
     * @tparam A       The return type of codeBlock
     * @return         Whatever block returns
     */
-  def makeScope[A](options: FirrtlExecutionOptions)(codeBlock: => A): A = {
+  def makeScope[A](options: LoggerOptions)(codeBlock: => A): A = {
     val runState: LoggerState = {
       val newRunState = updatableLoggerState.value.getOrElse(new LoggerState)
       if(newRunState.fromInvoke) {
@@ -143,6 +142,19 @@ object Logger {
   }
 
   /**
+    * This creates a block of code that will have access to the
+    * thread specific logger.  The state will be set according to the
+    * logging options set in the common options of the manager
+    * @param options  source of logger settings
+    * @param codeBlock      code to be run with these logger settings
+    * @tparam A       The return type of codeBlock
+    * @return         Whatever block returns
+    */
+  def makeScope[A](annotations: AnnotationSeq)(codeBlock: => A): A = {
+    makeScope(LoggerViewer.getView(annotations))(codeBlock)
+  }
+
+  /**
     * See makeScope using manager.  This creates a manager from a command line arguments style
     * list of strings
     * @param args List of strings
@@ -153,7 +165,7 @@ object Logger {
   @deprecated("Pass an explicit options manager via makeScope(ExecutionOptionsManager)", "1.2.0")
   def makeScope[A](args: Array[String] = Array.empty)(codeBlock: => A): A = {
     val optionsManager = new ExecutionOptionsManager("logger") with HasFirrtlExecutionOptions
-    makeScope(view[FirrtlExecutionOptions](optionsManager.parse(args)).get)(codeBlock)
+    makeScope(view[LoggerOptions](optionsManager.parse(args)).get)(codeBlock)
   }
 
   /**
@@ -337,9 +349,9 @@ object Logger {
   /**
     * This is used to set the options that have been set in a optionsManager or are coming
     * from the command line via an options manager
-    * @param optionsManager manager
+    * @param options manager
     */
-  def setOptions(options: FirrtlExecutionOptions): Unit = {
+  def setOptions(options: LoggerOptions): Unit = {
     state.globalLevel = (state.globalLevel, options.globalLogLevel) match {
       case (LogLevel.None, LogLevel.None) => LogLevel.None
       case (x, LogLevel.None) => x

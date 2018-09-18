@@ -2,23 +2,21 @@
 
 package firrtl
 
-import firrtl.ir.Circuit
-import firrtl.annotations.{
-  Annotation,
-  LegacyAnnotation,
-  AnnotationFileNotFoundException,
-  JsonProtocol }
-import firrtl.transforms.BlackBoxTargetDirAnno
-import firrtl.options.{OptionsView, ExecutionOptionsManager, RegisteredLibrary, OptionsException, DriverExecutionResult}
-import logger.LogLevel
 import java.io.{File, FileNotFoundException}
-import net.jcazevedo.moultingyaml._
+
 import firrtl.annotations.AnnotationYamlProtocol._
-import scala.util.{Try, Failure}
-import scopt.OptionParser
+import firrtl.annotations.{Annotation, AnnotationFileNotFoundException, JsonProtocol, LegacyAnnotation}
+import firrtl.ir.Circuit
+import firrtl.options.{DriverExecutionResult, ExecutionOptionsManager, OptionsException, OptionsView}
+import firrtl.transforms.BlackBoxTargetDirAnno
+import net.jcazevedo.moultingyaml._
+
+import scala.util.{Failure, Try}
 
 object FirrtlViewer {
   implicit object FirrtlOptionsView extends OptionsView[FirrtlExecutionOptions] {
+
+    //scalastyle:off cyclomatic.complexity method.length
     def view(options: AnnotationSeq): Option[FirrtlExecutionOptions] = {
       /* Pull in whatever the user tells us to from files until we can't find
        * any more. Remember what we've already imported to prevent a
@@ -56,10 +54,6 @@ object FirrtlViewer {
           val processed = x match {
             case TopNameAnnotation(n)              => c.copy(topName = Some(n))
             case TargetDirAnnotation(d)            => c.copy(targetDirName = d)
-            case LogLevelAnnotation(l)             => c.copy(globalLogLevel = l)
-            case ClassLogLevelAnnotation(n, l)     => c.copy(classLogLevels = c.classLogLevels ++ Map(n -> l))
-            case LogToFileAnnotation               => c.copy(logToFile = true)
-            case LogClassNamesAnnotation           => c.copy(logClassNames = true)
             case ProgramArgsAnnotation(s)          => c.copy(programArgs = c.programArgs :+ s)
             case InputFileAnnotation(f)            => c.copy(inputFileNameOverride = Some(f))
             case OutputFileAnnotation(f)           => c.copy(outputFileNameOverride = Some(f))
@@ -81,6 +75,12 @@ object FirrtlViewer {
       Some(x)
     }
   }
+
+  def getView(options: AnnotationSeq): FirrtlExecutionOptions = {
+    FirrtlOptionsView.view(options).getOrElse(
+      throw new FIRRTLException("Unable to determine FIRRTL options for provided command line options and annotations")
+    )
+  }
 }
 
 /** Firrtl output configuration specified by [[FirrtlExecutionOptions]]
@@ -96,10 +96,6 @@ final case class OneFilePerModule(targetDir: String) extends OutputConfig
   *
   * @param topName the name of the top module
   * @param targetDirName name of the target directory (default: ".")
-  * @param globalLogLevel the verbosity of logging (default: [[logger.LogLevel.None]])
-  * @param classLogLevels the individual verbosity of logging for specific classes
-  * @param logToFile if true, log to a file
-  * @param logClassNames indicates logging verbosity on a class-by-class basis
   * @param programArgs explicit program arguments
   * @param inputFileNameOverride input FIRRTL file, default: `targetDir/topName.fir`
   * @param outputFileNameOverride output file, default: `targetDir/topName.SUFFIX` with `SUFFIX`
@@ -108,17 +104,13 @@ final case class OneFilePerModule(targetDir: String) extends OutputConfig
   * @param compilerName which compiler to use (default: "verilog")
   * @param infoModeName the policy for generating [[firrtl.ir.Info]] when processing FIRRTL (default: "append")
   * @param customTransforms any custom [[Transform]] to run
-  * @param firrtlSource explicit input FIRRTL as a [[scala.String]]
-  * @param annotations a sequence of [[annotations.Annotation]] passed to the compiler
+  * @param firrtlSource explicit input FIRRTL as a [[String]]
+  * @param annotations a sequence of [[firrtl.annotations.Annotation]] passed to the compiler
   * @param emitOneFilePerModule enables one-file-per-module output in the [[Emitter]]
   */
 final case class FirrtlExecutionOptions(
   topName:                  Option[String]              = None,
   targetDirName:            String                      = TargetDirAnnotation().targetDirName,
-  globalLogLevel:           LogLevel.Value              = LogLevelAnnotation().globalLogLevel,
-  classLogLevels:           Map[String, LogLevel.Value] = Map.empty,
-  logToFile:                Boolean                     = false,
-  logClassNames:            Boolean                     = false,
   programArgs:              Seq[String]                 = Seq.empty,
   inputFileNameOverride:    Option[String]              = None,
   outputFileNameOverride:   Option[String]              = None,
@@ -293,7 +285,7 @@ object FirrtlExecutionUtils {
     */
   def targetDir(annotations: AnnotationSeq): String = annotations
     .collectFirst{ case TargetDirAnnotation(dir) => dir }
-    .getOrElse(new FirrtlExecutionOptions().targetDirName)
+    .getOrElse(FirrtlExecutionOptions().targetDirName)
 
   private[firrtl] def getFileExtension(file: String): FileExtension = file.drop(file.lastIndexOf('.')) match {
     case ".pb" => ProtoBufFile
@@ -323,11 +315,11 @@ object FirrtlExecutionUtils {
   /** Read all [[annotations.Annotation]] from a file in JSON or YAML format
     *
     * @param filename a JSON or YAML file of [[annotations.Annotation]]
-    * @throws annotations.AnnotationFileNotFoundException if the file does not exist
+    * @throws AnnotationFileNotFoundException if the file does not exist
     */
   def readAnnotationsFromFile(filename: String): AnnotationSeq = {
     val file = new File(filename).getCanonicalFile
-    if (!file.exists) { throw new AnnotationFileNotFoundException(file) }
+    if (!file.exists) { throw AnnotationFileNotFoundException(file) }
     JsonProtocol.deserializeTry(file).recoverWith { case jsonException =>
       // Try old protocol if new one fails
       Try {
@@ -370,11 +362,10 @@ object FirrtlExecutionUtils {
     * @return the annotation sequence with default annotations added
     */
   def addDefaults(annos: AnnotationSeq): AnnotationSeq = { //scalastyle:off cyclomatic.complexity
-    var Seq(td, bb, ll, c, tn) = Seq.fill(5)(true) //scalastyle:ignore
-    annos.collect{ case a: FirrtlOption => a }.map{
+    var Seq(td, bb, c, tn) = Seq.fill(4)(true) //scalastyle:ignore
+    annos.collect{ case a: FirrtlOption => a }.foreach {
       case _: TargetDirAnnotation       => td = false
       case _: BlackBoxTargetDirAnno     => bb = false
-      case _: LogLevelAnnotation        => ll = false
       case _: CompilerNameAnnotation    => c  = false
       case _: TopNameAnnotation         => tn = false
       case _ =>
@@ -387,7 +378,6 @@ object FirrtlExecutionUtils {
     annos ++
       (if (td)                 Seq(TargetDirAnnotation(targetDir))               else Seq() ) ++
       (if (bb)                 Seq(BlackBoxTargetDirAnno(targetDir))             else Seq() ) ++
-      (if (ll)                 Seq(LogLevelAnnotation(default.globalLogLevel))   else Seq() ) ++
       (if (c)                  Seq(CompilerNameAnnotation(default.compilerName)) else Seq() ) ++
       (if (tn & name.nonEmpty) Seq(TopNameAnnotation(name.get))                  else Seq() )
   } //scalastyle:on cyclomatic.complexity
@@ -413,9 +403,10 @@ object FirrtlExecutionUtils {
     * @param annos a sequence of [[annotation.Annotation]]
     * @return true if all checks pass
     */
+  //scalastyle:off cyclomatic.complexity method.length
   def checkAnnotations(annos: AnnotationSeq): AnnotationSeq = {
-    val Seq(tn, inF, inS, ofpm, outF, td, ll, i, foaf, comp, info, c) =
-      Seq.fill(12)(collection.mutable.ListBuffer[Annotation]())
+    val Seq(tn, inF, inS, ofpm, outF, td, i, foaf, comp, info, c) =
+      Seq.fill(11)(collection.mutable.ListBuffer[Annotation]())
     annos.foreach(
       _ match {
         case a: TopNameAnnotation                   => tn   += a
@@ -424,7 +415,6 @@ object FirrtlExecutionUtils {
         case a: EmitOneFilePerModuleAnnotation.type => ofpm += a
         case a: OutputFileAnnotation                => outF += a
         case a: TargetDirAnnotation                 => td   += a
-        case a: LogLevelAnnotation                  => ll   += a
         case a: OutputAnnotationFileAnnotation      => foaf += a
         case a: CompilerNameAnnotation              => comp += a
         case a: InfoModeAnnotation                  => info += a
@@ -449,9 +439,9 @@ object FirrtlExecutionUtils {
             |    - one file per module (${ofpm.size} times):  -fsm, --split-modules, EmitOneFilePerModuleAnnotation"""
           .stripMargin )}
     if (outF.size > 1) {
-      val x = outF.map{ case OutputFileAnnotation(x) => x }
+      val y = outF.map{ case OutputFileAnnotation(x) => x }
       throw new FIRRTLException(
-        s"""|No more than one output file can be specified, but found '${x.mkString(", ")}' specified via:
+        s"""|No more than one output file can be specified, but found '${y.mkString(", ")}' specified via:
             |    - option or annotation: -o, --output-file, OutputFileAnnotation""".stripMargin) }
     if (tn.size != 1) {
       val n = tn.map{ case TopNameAnnotation(x) => x }
@@ -465,32 +455,27 @@ object FirrtlExecutionUtils {
         s"""|Exactly one target directory must be specified/determinable, but found `${d.mkString(", ")}` specified via:
             |    - explicit target directory: -td, --target-dir, TargetDirAnnotation
             |    - fallback default value""".stripMargin )}
-    if (ll.size > 1) {
-      val l = ll.map{ case LogLevelAnnotation(x) => x }
-      throw new FIRRTLException(
-        s"""|At most one log level can be specified, but found '${l.mkString(", ")}' specified via:
-            |    - an option or annotation: -ll, --log-level, LogLevelAnnotation""".stripMargin )}
     if (foaf.size > 1) {
-      val x = foaf.map{ case OutputAnnotationFileAnnotation(x) => x }
+      val y = foaf.map{ case OutputAnnotationFileAnnotation(x) => x }
       throw new FIRRTLException(
-        s"""|At most one output annotation file can be specified, but found '${x.mkString(", ")}' specified via:
+        s"""|At most one output annotation file can be specified, but found '${y.mkString(", ")}' specified via:
             |    - an option or annotation: -foaf, --output-annotation-file, OutputAnnotationFileAnnotation"""
           .stripMargin )}
     comp.foreach{ case CompilerNameAnnotation(x) =>
       if (!Set("high", "middle", "low", "verilog", "sverilog").contains(x)) {
         throw new FIRRTLException(s"Unknown compiler '$x' (did you misspell it?)") }}
     if (comp.size > 1) {
-      val x = comp.map{ case CompilerNameAnnotation(x) => x }
+      val y = comp.map{ case CompilerNameAnnotation(x) => x }
       throw new FIRRTLException(
-        s"""|FIRRTL currently only supports one target compiler, but found '${x.mkString(", ")}' specified via:
+        s"""|FIRRTL currently only supports one target compiler, but found '${y.mkString(", ")}' specified via:
             |    - an option or annotation: -X, --compiler, CompilerNameAnnotation""".stripMargin )}
     info.foreach{ case InfoModeAnnotation(x) =>
-      if (!(Set("ignore", "use", "gen", "append").contains(x))) {
+      if (! Set("ignore", "use", "gen", "append").contains(x)) {
         throw new FIRRTLException(s"Unknown info mode '$x' (did you misspell it?)") }}
     if (info.size > 1) {
-      val x = info.map{ case InfoModeAnnotation(x) => x }
+      val y = info.map{ case InfoModeAnnotation(x) => x }
       throw new FIRRTLException(
-        s"""|Only one info mode may be specified, but found '${x.mkString(", ")}' specified via:
+        s"""|Only one info mode may be specified, but found '${y.mkString(", ")}' specified via:
             |    - an option or annotation: --info-mode, InfoModeAnnotation""".stripMargin )}
 
     annos
@@ -498,8 +483,6 @@ object FirrtlExecutionUtils {
 }
 
 trait HasFirrtlExecutionOptions { this: ExecutionOptionsManager =>
-  import firrtl.options.Viewer._
-  import firrtl.FirrtlViewer._
 
   parser.note("Common Options")
   /* [Note 1] Any validation related to these options is removed here. Since
@@ -511,12 +494,8 @@ trait HasFirrtlExecutionOptions { this: ExecutionOptionsManager =>
    * [[FirrtlExecutionUtils.checkAnnotations]]. */
   Seq( TopNameAnnotation(),
        TargetDirAnnotation(),
-       LogLevelAnnotation(),
-       ClassLogLevelAnnotation(),
-       LogToFileAnnotation,
-       LogClassNamesAnnotation,
        ProgramArgsAnnotation() )
-    .map(_.addOptions(parser))
+    .foreach(_.addOptions(parser))
 
   parser.help("help").text("prints this usage text")
 
@@ -530,13 +509,13 @@ trait HasFirrtlExecutionOptions { this: ExecutionOptionsManager =>
        InputAnnotationFileAnnotation(),
        CompilerNameAnnotation(),
        RunFirrtlTransformAnnotation() )
-    .map(_.addOptions(parser))
+    .foreach(_.addOptions(parser))
 
   parser.opt[Unit]("force-append-anno-file")
     .abbr("ffaaf")
     .hidden()
     .unbounded()
-    .action{ (x, c) =>
+    .action{ (_, c) =>
       val msg = "force-append-anno-file is deprecated\n" + (" "*9) + "(It does not do anything anymore)"
       Driver.dramaticWarning(msg)
       c }
