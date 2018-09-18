@@ -7,8 +7,8 @@ import firrtl.options.ExecutionOptionsManager
 import firrtl.annotations.Annotation
 import firrtl.options.Viewer._
 import firrtl.FirrtlViewer._
-import logger.LogLevel
-import org.scalatest.{Matchers, FreeSpec}
+import logger.{LogLevel, LogLevelAnnotation, LoggerViewer}
+import org.scalatest.{FreeSpec, Matchers}
 
 trait HasDuplicateLongOption {
   self: ExecutionOptionsManager =>
@@ -35,13 +35,14 @@ class ExecutionOptionsManagerSpec extends FreeSpec with Matchers {
     "when constructed sanely" - {
       "should have default FIRRTL options" in {
         val f = argsToOptions(Array("--top-name", "null"))
+        val loggerOpts = LoggerViewer.getView(Seq.empty)
         // This is explicitly enumerated (as opposed to being compared to
         // FirrtlExecutionOptions()) to catch changes in
         // FirrtlExecutionOptions that a developer may make, requiring
         // that they also change this test.
         f.targetDirName should be (".")
-        f.globalLogLevel should be (LogLevel.None)
-        f.logToFile should be (false)
+        loggerOpts.globalLogLevel should be (LogLevel.None)
+        loggerOpts.logToFile should be (false)
         f.outputFileNameOverride should be (None)
         f.outputAnnotationFileName should be (None)
         f.compilerName should be ("verilog")

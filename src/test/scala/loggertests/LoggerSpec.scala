@@ -2,7 +2,7 @@
 
 package loggertests
 
-import firrtl.{HasFirrtlExecutionOptions, FirrtlExecutionOptions}
+import firrtl.{AnnotationSeq, FirrtlExecutionOptions, HasFirrtlExecutionOptions}
 import firrtl.options.ExecutionOptionsManager
 import firrtl.options.Viewer._
 import firrtl.FirrtlViewer._
@@ -40,12 +40,14 @@ class LogsInfo3 extends LazyLogging {
 }
 class LoggerSpec extends FreeSpec with Matchers with OneInstancePerTest with LazyLogging {
 
-  def argsToOptions(args: Array[String]): FirrtlExecutionOptions = {
+  def argsToOptions(args: Array[String]): AnnotationSeq = {
     val optionsManager = new ExecutionOptionsManager("test") with HasFirrtlExecutionOptions
-    view[FirrtlExecutionOptions](optionsManager.parse(args)).get
+    optionsManager.parse(args)
   }
 
   val dummyOptions = argsToOptions(Array("--top-name", "null"))
+
+
   "Logger is a simple but powerful logging system" - {
     "Following tests show how global level can control logging" - {
       "only error shows up by default" in {

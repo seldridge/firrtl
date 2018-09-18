@@ -16,7 +16,7 @@ name := "firrtl"
 
 version := "1.2-SNAPSHOT"
 
-scalaVersion := "2.11.12"
+scalaVersion := "2.12.6"
 
 crossScalaVersions := Seq("2.11.12", "2.12.4")
 
