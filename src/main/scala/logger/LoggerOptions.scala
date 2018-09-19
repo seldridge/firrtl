@@ -137,9 +137,7 @@ object LoggerViewer {
         annotation match {
           case LogLevelAnnotation(logLevel) => previousOptions.copy(globalLogLevel = logLevel)
           case ClassLogLevelAnnotation(name, level) =>
-            val newLogLevels = previousOptions.classLogLevels
-            newLogLevels ++ Seq(name, level)
-            previousOptions.copy(classLogLevels = newLogLevels)
+            previousOptions.copy(classLogLevels = previousOptions.classLogLevels + (name -> level))
           case LogToFileAnnotation => previousOptions.copy(logToFile = true)
           case LogClassNamesAnnotation => previousOptions.copy(logClassNames = true)
           case _ => previousOptions
@@ -155,5 +153,3 @@ object LoggerViewer {
     )
   }
 }
-
-
