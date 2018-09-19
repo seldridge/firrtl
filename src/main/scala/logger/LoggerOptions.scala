@@ -7,7 +7,7 @@ import firrtl.options.{ExecutionOptionsManager, HasScoptOptions, OptionsView}
 import firrtl.{AnnotationSeq, FIRRTLException}
 import scopt.OptionParser
 
-/** Internal options used to control the FIRRTL compiler
+/** Internal options used to control the logging in programs that are part of the Chisel stack
   *
   * @param globalLogLevel the verbosity of logging (default: [[logger.LogLevel.None]])
   * @param classLogLevels the individual verbosity of logging for specific classes
