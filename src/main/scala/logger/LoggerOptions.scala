@@ -131,7 +131,7 @@ trait HasLoggerOptions { this: ExecutionOptionsManager =>
 }
 
 object LoggerViewer {
-  implicit object FirrtlOptionsView extends OptionsView[LoggerOptions] {
+  implicit object LoggerOptionsView extends OptionsView[LoggerOptions] {
     def view(options: AnnotationSeq): Option[LoggerOptions] = {
       val opts = options.foldLeft(LoggerOptions()) { (previousOptions, annotation) =>
         annotation match {
@@ -148,7 +148,7 @@ object LoggerViewer {
   }
 
   def getView(annotationSeq: AnnotationSeq): LoggerOptions = {
-    FirrtlOptionsView.view(annotationSeq).getOrElse(
+    LoggerOptionsView.view(annotationSeq).getOrElse(
       throw new FIRRTLException("Unable to determine Logger options for provided command line options and annotations")
     )
   }
