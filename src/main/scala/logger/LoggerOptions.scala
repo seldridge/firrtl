@@ -111,29 +111,24 @@ case object LogClassNamesAnnotation extends NoTargetAnnotation with LoggerOption
     .text(s"shows class names and log level in logging output, useful for target --class-log-level")
 }
 
-trait HasLoggerOptions { this: ExecutionOptionsManager =>
-
-  parser.note("Logger Options")
-  /* [Note 1] Any validation related to these options is removed here. Since
-   * we need to check annotations anyway, arguments here are purposefully
-   * marked as `unbounded` and no validation checking occurs (except that
-   * which is related to ensuring that a command line string is validly
-   * converted to some type, e.g., --log-level). All of the actual option
-   * validation happens when the annotations are processed in
-   * [[FirrtlExecutionUtils.checkAnnotations]]. */
-  Seq(
-    LogLevelAnnotation(),
-    ClassLogLevelAnnotation(),
-    LogToFileAnnotation,
-    LogClassNamesAnnotation,
-  )
-  .foreach(_.addOptions(parser))
-}
-
 object LoggerViewer {
   implicit object LoggerOptionsView extends OptionsView[LoggerOptions] {
+    private def checkAnnotations(annos: AnnotationSeq): AnnotationSeq = {
+      val ll = collection.mutable.ListBuffer[Annotation]()
+      annos.foreach(
+        _ match {
+          case a: LogLevelAnnotation => ll += a
+          case _                     =>         })
+      if (ll.size > 1) {
+        val l = ll.map{ case LogLevelAnnotation(x) => x }
+        throw new FIRRTLException(
+          s"""|At most one log level can be specified, but found '${l.mkString(", ")}' specified via:
+              |    - an option or annotation: -ll, --log-level, LogLevelAnnotation""".stripMargin )}
+      annos
+    }
+
     def view(options: AnnotationSeq): Option[LoggerOptions] = {
-      val opts = options.foldLeft(LoggerOptions()) { (previousOptions, annotation) =>
+      val opts = checkAnnotations(options).foldLeft(LoggerOptions()) { (previousOptions, annotation) =>
         annotation match {
           case LogLevelAnnotation(logLevel) => previousOptions.copy(globalLogLevel = logLevel)
           case ClassLogLevelAnnotation(name, level) =>

@@ -7,7 +7,8 @@ import firrtl.options.ExecutionOptionsManager
 import firrtl.annotations.Annotation
 import firrtl.options.Viewer._
 import firrtl.FirrtlViewer._
-import logger.{LogLevel, LogLevelAnnotation, LoggerViewer}
+import logger.LoggerViewer._
+import logger.{LogLevel, LogLevelAnnotation, LoggerOptions}
 import org.scalatest.{FreeSpec, Matchers}
 
 trait HasDuplicateLongOption {
@@ -28,14 +29,15 @@ class ExecutionOptionsManagerSpec extends FreeSpec with Matchers {
 
   def argsToOptions(args: Array[String], initAnnos: AnnotationSeq = Seq.empty): FirrtlExecutionOptions = {
     val optionsManager = new ExecutionOptionsManager("test") with HasFirrtlExecutionOptions
-    view[FirrtlExecutionOptions](optionsManager.parse(args, initAnnos)).get
+    val annotations = optionsManager.parse(args, initAnnos)
+    view[FirrtlExecutionOptions](annotations).get
   }
 
   "ExecutionOptionsManager with HasFirrtlExecutionOptions" - {
     "when constructed sanely" - {
       "should have default FIRRTL options" in {
         val f = argsToOptions(Array("--top-name", "null"))
-        val loggerOpts = LoggerViewer.getView(Seq.empty)
+        val loggerOpts = view[LoggerOptions](Seq.empty).get
         // This is explicitly enumerated (as opposed to being compared to
         // FirrtlExecutionOptions()) to catch changes in
         // FirrtlExecutionOptions that a developer may make, requiring
@@ -53,7 +55,6 @@ class ExecutionOptionsManagerSpec extends FreeSpec with Matchers {
           List(firrtl.transforms.BlackBoxTargetDirAnno("."),
                TopNameAnnotation("null"),
                TargetDirAnnotation("."),
-               LogLevelAnnotation(LogLevel.None),
                EmitterAnnotation(classOf[VerilogEmitter]),
                CompilerNameAnnotation("verilog") ))
         f.emitOneFilePerModule should be (false)
@@ -106,9 +107,6 @@ class ExecutionOptionsManagerSpec extends FreeSpec with Matchers {
       shouldExceptOnOptionsOrAnnotations("should fail with multiple top names",
                                          Array("-tn", "bar"),
                                          Seq(TopNameAnnotation("foo"), TopNameAnnotation("foo")))
-      shouldExceptOnOptionsOrAnnotations("should fail with multiple log levels",
-                                         Array("--log-level", "Info", "-ll", "debug"),
-                                         Seq(LogLevelAnnotation(LogLevel.Info), LogLevelAnnotation(LogLevel.Info)))
       shouldExceptOnOptionsOrAnnotations("should fail with multiple output annotation files",
                                          Array("-foaf", "foo", "--output-annotation-file", "bar"),
                                          Seq(OutputAnnotationFileAnnotation("foo"),
