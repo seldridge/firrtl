@@ -35,7 +35,6 @@ class DriverSpec extends FreeSpec with Matchers with BackendCompilationUtilities
   val defaultAnnotations: Set[Annotation] = Set(
     TargetDirAnnotation("."),
     BlackBoxTargetDirAnno("."),
-    LogLevelAnnotation(logger.LogLevel.None),
     CompilerNameAnnotation("verilog"),
     EmitterAnnotation(classOf[VerilogEmitter]) )
 
